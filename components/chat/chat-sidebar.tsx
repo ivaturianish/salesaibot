@@ -1,16 +1,16 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import { useRouter, usePathname } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
-import { 
-  MessageSquare, 
-  Plus, 
-  Trash2, 
-  Edit2, 
+import {
+  MessageSquare,
+  Plus,
+  Trash2,
+  Edit2,
   MoreVertical,
   Search,
   Settings,
@@ -24,18 +24,19 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
-import { 
-  Dialog, 
-  DialogContent, 
-  DialogDescription, 
-  DialogFooter, 
-  DialogHeader, 
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
   DialogTitle,
   DialogTrigger
 } from '@/components/ui/dialog';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useToast } from '@/components/ui/use-toast';
 import { useAuth } from '@/hooks/use-auth';
+import { useChatStorage } from '@/hooks/use-chat-storage';
 import AnimatedElement from '@/components/animated-element';
 
 interface Chat {
@@ -50,7 +51,8 @@ export function ChatSidebar() {
   const pathname = usePathname();
   const { toast } = useToast();
   const { user, logout } = useAuth();
-  
+  const { createChat } = useChatStorage();
+
   const [isOpen, setIsOpen] = useState(true);
   const [chats, setChats] = useState<Chat[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
@@ -59,77 +61,140 @@ export function ChatSidebar() {
   const [editTitle, setEditTitle] = useState('');
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [chatToDelete, setChatToDelete] = useState<string | null>(null);
-  
+
   // Fetch chat history
-  useEffect(() => {
-    const fetchChats = async () => {
-      try {
-        setIsLoading(true);
-        // In a real implementation, this would fetch from an API
-        // For now, we'll use mock data
-        const mockChats: Chat[] = [
-          {
-            id: '1',
-            title: 'Objection Handling Techniques',
-            updatedAt: new Date(Date.now() - 1000 * 60 * 30).toISOString(), // 30 minutes ago
-            preview: 'How do I handle price objections effectively?'
-          },
-          {
-            id: '2',
-            title: 'Closing Strategies',
-            updatedAt: new Date(Date.now() - 1000 * 60 * 60 * 2).toISOString(), // 2 hours ago
-            preview: 'What are the best closing techniques for enterprise sales?'
-          },
-          {
-            id: '3',
-            title: 'Discovery Questions',
-            updatedAt: new Date(Date.now() - 1000 * 60 * 60 * 24).toISOString(), // 1 day ago
-            preview: 'Help me craft effective discovery questions for my next call.'
-          }
-        ];
-        
-        setChats(mockChats);
-      } catch (error) {
-        console.error('Error fetching chats:', error);
-        toast({
-          title: 'Failed to load chat history',
-          description: 'Please try again later.',
-          variant: 'destructive',
-        });
-      } finally {
-        setIsLoading(false);
+  const fetchChats = useCallback(async () => {
+    try {
+      setIsLoading(true);
+      // Fetch chats from the API
+      const response = await fetch('/api/chats');
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to fetch chats');
       }
-    };
-    
-    fetchChats();
+
+      // Transform the data to match our Chat interface and filter out empty chats
+      const formattedChats: Chat[] = data.chats
+        .filter((chat: any) => {
+          // Only include chats that have more than 1 message (more than just the welcome message)
+          // or chats that have at least one user message
+          return chat.messages && (
+            chat.messages.length > 1 ||
+            chat.messages.some((msg: any) => msg.role === 'user')
+          );
+        })
+        .map((chat: any) => {
+          // Find the first user message to use for preview
+          const userMessage = chat.messages.find((msg: any) => msg.role === 'user');
+          const lastMessage = chat.messages[chat.messages.length - 1];
+
+          return {
+            id: chat._id,
+            title: chat.title,
+            updatedAt: chat.updatedAt,
+            // Use the first user message as preview or the last message if no user message exists
+            preview: userMessage
+              ? userMessage.content.substring(0, 50) + (userMessage.content.length > 50 ? '...' : '')
+              : lastMessage
+                ? lastMessage.content.substring(0, 50) + (lastMessage.content.length > 50 ? '...' : '')
+                : 'No messages'
+          };
+        });
+
+      setChats(formattedChats);
+    } catch (error) {
+      console.error('Error fetching chats:', error);
+      toast({
+        title: 'Failed to load chat history',
+        description: 'Please try again later.',
+        variant: 'destructive',
+      });
+      // Set empty chats array on error
+      setChats([]);
+    } finally {
+      setIsLoading(false);
+    }
   }, [toast]);
-  
+
+  // Fetch chats on component mount
+  useEffect(() => {
+    fetchChats();
+  }, [fetchChats]);
+
   // Filter chats based on search query
-  const filteredChats = chats.filter(chat => 
+  const filteredChats = chats.filter(chat =>
     chat.title.toLowerCase().includes(searchQuery.toLowerCase())
   );
-  
+
   // Handle new chat
-  const handleNewChat = () => {
-    router.push('/chat');
+  const handleNewChat = async () => {
+    try {
+      setIsLoading(true);
+      // Create a new chat with default welcome message
+      const initialMessage = {
+        id: "welcome",
+        role: "assistant" as const,
+        content: "Hi there! I'm your AI sales coach. You can chat with me about sales techniques, upload sales calls for analysis, or practice your pitch. How can I help you today?",
+      };
+
+      // Create a new chat with the welcome message
+      const chatId = await createChat('New Chat', [initialMessage]);
+
+      // Refresh the chat list
+      await fetchChats();
+
+      // Navigate to the specific chat page with the new chat ID
+      if (chatId) {
+        router.push(`/chat/${chatId}`);
+      } else {
+        // If no chatId was returned, just go to the main chat page
+        router.push('/chat');
+      }
+
+      toast({
+        title: 'New chat created',
+        description: 'You can now start a new conversation.',
+      });
+    } catch (error) {
+      console.error('Error creating new chat:', error);
+      toast({
+        title: 'Failed to create new chat',
+        description: 'Please try again later.',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsLoading(false);
+    }
   };
-  
+
   // Handle chat selection
   const handleSelectChat = (chatId: string) => {
     router.push(`/chat/${chatId}`);
   };
-  
+
   // Handle chat deletion
   const handleDeleteChat = async (chatId: string) => {
     try {
-      // In a real implementation, this would call an API
-      setChats(chats.filter(chat => chat.id !== chatId));
-      
+      setIsLoading(true);
+      // Call the API to delete the chat
+      const response = await fetch(`/api/chats/${chatId}`, {
+        method: 'DELETE',
+      });
+
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error || 'Failed to delete chat');
+      }
+
+      // Refresh the chat list
+      await fetchChats();
+
       toast({
         title: 'Chat deleted',
         description: 'The chat has been deleted successfully.',
       });
-      
+
       // If we're currently viewing the deleted chat, redirect to new chat
       if (pathname === `/chat/${chatId}`) {
         router.push('/chat');
@@ -142,19 +207,33 @@ export function ChatSidebar() {
         variant: 'destructive',
       });
     } finally {
+      setIsLoading(false);
       setIsDeleteDialogOpen(false);
       setChatToDelete(null);
     }
   };
-  
+
   // Handle chat edit
   const handleEditChat = async (chatId: string, newTitle: string) => {
     try {
-      // In a real implementation, this would call an API
-      setChats(chats.map(chat => 
-        chat.id === chatId ? { ...chat, title: newTitle } : chat
-      ));
-      
+      setIsLoading(true);
+      // Call the API to update the chat title
+      const response = await fetch(`/api/chats/${chatId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ title: newTitle }),
+      });
+
+      if (!response.ok) {
+        const data = await response.json();
+        throw new Error(data.error || 'Failed to rename chat');
+      }
+
+      // Refresh the chat list
+      await fetchChats();
+
       toast({
         title: 'Chat renamed',
         description: 'The chat has been renamed successfully.',
@@ -167,26 +246,31 @@ export function ChatSidebar() {
         variant: 'destructive',
       });
     } finally {
+      setIsLoading(false);
       setEditingChatId(null);
       setEditTitle('');
     }
   };
-  
+
   // Format date for display
   const formatDate = (dateString: string) => {
     const date = new Date(dateString);
     const now = new Date();
     const diffInHours = (now.getTime() - date.getTime()) / (1000 * 60 * 60);
-    
+
     if (diffInHours < 24) {
       return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
     } else if (diffInHours < 48) {
       return 'Yesterday';
     } else {
-      return date.toLocaleDateString([], { month: 'short', day: 'numeric' });
+      // Format as MM/DD/YYYY for dates older than 24 hours
+      const month = (date.getMonth() + 1).toString().padStart(2, '0');
+      const day = date.getDate().toString().padStart(2, '0');
+      const year = date.getFullYear();
+      return `${month}/${day}/${year}`;
     }
   };
-  
+
   // Handle logout
   const handleLogout = async () => {
     try {
@@ -201,7 +285,7 @@ export function ChatSidebar() {
       });
     }
   };
-  
+
   return (
     <div className={`flex flex-col h-full border-r border-border/40 bg-background/80 backdrop-blur transition-all duration-300 ${isOpen ? 'w-80' : 'w-0'}`}>
       {isOpen && (
@@ -216,11 +300,11 @@ export function ChatSidebar() {
                 <MoreVertical className="h-5 w-5" />
               </Button>
             </div>
-            
+
             {/* New Chat Button */}
             <div className="px-4 pb-2">
-              <Button 
-                variant="gradient" 
+              <Button
+                variant="gradient"
                 className="w-full justify-start gap-2 rounded-lg"
                 onClick={handleNewChat}
               >
@@ -228,7 +312,7 @@ export function ChatSidebar() {
                 New Chat
               </Button>
             </div>
-            
+
             {/* Search */}
             <div className="px-4 pb-2">
               <div className="relative">
@@ -241,9 +325,9 @@ export function ChatSidebar() {
                 />
               </div>
             </div>
-            
+
             <Separator className="my-2" />
-            
+
             {/* Chat List */}
             <ScrollArea className="flex-1 px-2">
               {isLoading ? (
@@ -293,7 +377,7 @@ export function ChatSidebar() {
                           </>
                         )}
                       </div>
-                      
+
                       {editingChatId !== chat.id && (
                         <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
                           <Button
@@ -322,7 +406,7 @@ export function ChatSidebar() {
                           </Button>
                         </div>
                       )}
-                      
+
                       <span className="text-xs text-muted-foreground ml-2 flex-shrink-0">
                         {formatDate(chat.updatedAt)}
                       </span>
@@ -341,7 +425,7 @@ export function ChatSidebar() {
                 </div>
               )}
             </ScrollArea>
-            
+
             {/* User Profile */}
             <div className="p-4 border-t border-border/40">
               <DropdownMenu>
@@ -372,7 +456,7 @@ export function ChatSidebar() {
           </div>
         </AnimatedElement>
       )}
-      
+
       {/* Delete Confirmation Dialog */}
       <Dialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
         <DialogContent>
@@ -386,8 +470,8 @@ export function ChatSidebar() {
             <Button variant="outline" onClick={() => setIsDeleteDialogOpen(false)}>
               Cancel
             </Button>
-            <Button 
-              variant="destructive" 
+            <Button
+              variant="destructive"
               onClick={() => chatToDelete && handleDeleteChat(chatToDelete)}
             >
               Delete

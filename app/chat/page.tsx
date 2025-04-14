@@ -14,6 +14,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { TokenUsage } from "@/components/token-usage"
 import { extractTextFromPdf } from "@/lib/pdf-worker"
 import { useAudioRecorder } from "@/hooks/use-audio-recorder"
+import { AudioPlayer } from "@/components/chat/audio-player"
 import {
   AlertCircle,
   FileText,
@@ -29,17 +30,17 @@ import {
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { useGemini } from "@/hooks/use-gemini"
-import { BotAvatar } from "@/components/ui/bot-avatar"
-import { MarkdownMessage } from "@/components/chat/markdown-message"
-import { cn } from "@/lib/utils"
+// import { cn } from "@/lib/utils" // Kept for future use
 import { ErrorMessage } from "@/components/chat/error-message"
 import { LoadingSpinner } from "@/components/chat/loading-spinner"
 import { SuggestedPrompts } from "@/components/chat/suggested-prompts"
 import { ChatSearch } from "@/components/chat/chat-search"
+import { ChatMessage } from "@/components/chat/chat-message"
 import { useChatErrors } from "@/hooks/use-chat-errors"
 import { useFileProcessing } from "@/hooks/use-file-processing"
 import { useFileValidation } from "@/hooks/use-file-validation"
 import { useTokenUsage } from "@/hooks/use-token-usage"
+import { useChatStorage } from "@/hooks/use-chat-storage"
 
 interface Message {
   id: string
@@ -67,31 +68,43 @@ interface Message {
 // ErrorState interface removed - not used
 
 export default function ChatPage() {
+  // Initialize with a welcome message if no chat is loaded
+  const initialMessages = [
+    {
+      id: "welcome",
+      role: "assistant" as const,
+      content:
+        "Hi there! I'm your AI sales coach. You can chat with me about sales techniques, upload sales calls for analysis, or practice your pitch. How can I help you today?",
+    },
+  ];
+
+  // Use the chat storage hook to manage messages
   const {
-    messages: geminiMessages,
-    setMessages: setGeminiMessages,
-    // isLoading not used
+    messages: storedMessages,
+    saveMessage,
+    isLoading: chatLoading,
+    createChat,
+  } = useChatStorage({ initialMessages })
+
+  // Use Gemini for AI responses
+  const {
     sendMessage: sendGeminiMessage,
     analyzeContent: analyzeContentWithGemini,
   } = useGemini({
-    initialMessages: [
-      {
-        id: "welcome",
-        role: "assistant",
-        content:
-          "Hi there! I'm your AI sales coach. You can chat with me about sales techniques, upload sales calls for analysis, or practice your pitch. How can I help you today?",
-      },
-    ],
+    initialMessages,
   })
 
-  const [messages, setMessages] = useState<Message[]>(geminiMessages)
+  const [messages, setMessages] = useState<Message[]>(storedMessages)
 
+  // Keep messages in sync with stored messages
   useEffect(() => {
-    setGeminiMessages(messages)
-  }, [messages, setGeminiMessages])
+    setMessages(storedMessages)
+  }, [storedMessages])
 
   const [input, setInput] = useState("")
   const [recordingComplete, setRecordingComplete] = useState(false)
+  const [audioBlob, setAudioBlob] = useState<Blob | null>(null)
+  const [showAudioPlayer, setShowAudioPlayer] = useState(false)
 
   // Audio recorder hook
   const {
@@ -99,17 +112,39 @@ export default function ChatPage() {
     recordingDuration,
     startRecording,
     stopRecording,
-    cancelRecording: cancelAudioRecording,
-    // recordingBlob not used directly as it's handled in onRecordingComplete
+    cancelRecording: cancelAudioRecording
   } = useAudioRecorder({
-    onRecordingComplete: (audioBlob, _duration) => {
-      // Create a File object from the Blob
-      const file = new File([audioBlob], "recorded_audio.mp3", { type: "audio/mp3" })
-      setSelectedFile(file)
+    onRecordingComplete: (blob, _duration) => {
+      setAudioBlob(blob)
+      setShowAudioPlayer(true)
       setRecordingComplete(true)
     }
   })
+  // Combine loading states
   const [isLoading, setIsLoading] = useState(false)
+
+  // Update loading state when chat loading state changes
+  useEffect(() => {
+    setIsLoading(chatLoading)
+  }, [chatLoading])
+
+  // Create a new chat if we're on the main chat page and no chat is loaded
+  useEffect(() => {
+    const initializeChat = async () => {
+      // If we're on the main chat page (not a specific chat) and there are no messages
+      // other than the initial welcome message, create a new chat
+      if (storedMessages.length <= 1 && storedMessages[0]?.id === 'welcome') {
+        try {
+          // Create a new chat with the welcome message
+          await createChat('New Chat', storedMessages);
+        } catch (error) {
+          console.error('Error creating initial chat:', error);
+        }
+      }
+    };
+
+    initializeChat();
+  }, [storedMessages, createChat])
   const [selectedFile, setSelectedFile] = useState<File | null>(null)
 
   // Token usage tracking
@@ -171,9 +206,19 @@ export default function ChatPage() {
     return `${mins.toString().padStart(2, "0")}:${secs.toString().padStart(2, "0")}`
   }
 
-  const handleSendMessage = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if ((!input.trim() && !selectedFile) || isLoading || isProcessing) return
+  const handleSendMessage = async (e: React.FormEvent | string) => {
+    // Handle both form events and direct string inputs
+    let messageContent = input;
+
+    if (typeof e === 'object') {
+      e.preventDefault();
+      // Using the input state value
+    } else if (typeof e === 'string') {
+      // Using the provided string directly
+      messageContent = e;
+    }
+
+    if ((!messageContent.trim() && !selectedFile) || isLoading || isProcessing) return
 
     clearError()
     startProcessing()
@@ -181,7 +226,7 @@ export default function ChatPage() {
     let userMessage: Message = {
       id: Date.now().toString(),
       role: "user",
-      content: input,
+      content: messageContent,
     }
 
     if (selectedFile) {
@@ -222,17 +267,38 @@ export default function ChatPage() {
           }
         } else if (fileType === "audio" || fileType === "video") {
           try {
-            const buffer = await selectedFile.arrayBuffer()
-            const base64 = btoa(
-              new Uint8Array(buffer).reduce(
-                (data, byte) => data + String.fromCharCode(byte),
-                ""
-              )
-            )
-            fileContent = `data:${selectedFile.type};base64,${base64}`
+            // For audio and video files, we'll send them to the server for transcription
+            // First, create a FormData object to send the file
+            const formData = new FormData()
+            formData.append('file', selectedFile)
+            formData.append('fileType', fileType)
+
+            // Show a processing message
+            setProcessingError(`Transcribing ${fileType} content. This may take a moment...`)
+            updateProgress(40)
+
+            // Send the file to the server for transcription
+            const response = await fetch('/api/transcribe', {
+              method: 'POST',
+              body: formData,
+            })
+
+            if (!response.ok) {
+              const errorData = await response.json()
+              throw new Error(errorData.error || `Failed to transcribe ${fileType} file. Server returned ${response.status}`)
+            }
+
+            const data = await response.json()
+            fileContent = data.transcript || `[${fileType.toUpperCase()} content could not be transcribed]`
+
+            // Show success message
+            setProcessingError(`Successfully transcribed ${fileType} content. Analyzing...`)
+
+            // Update progress
+            updateProgress(80)
           } catch (error) {
             console.error("Media file processing error:", error)
-            setProcessingError("Failed to process media file. The file might be corrupted or in an unsupported format.")
+            setProcessingError(`Failed to transcribe ${fileType} file. The file might be corrupted or in an unsupported format.`)
             handleFileError(error, () => {
               setSelectedFile(null)
               resetProcessing()
@@ -241,7 +307,8 @@ export default function ChatPage() {
           }
         }
 
-        setMessages((prev) => [...prev, userMessage])
+        // Save the user message to storage
+        await saveMessage(userMessage)
         setInput("")
         setSelectedFile(null)
         setRecordingComplete(false)
@@ -254,6 +321,9 @@ export default function ChatPage() {
             selectedFile.name,
             input
           )
+
+          // Save the analysis message to storage
+          await saveMessage(analysisMessage)
 
           setCurrentAnalysis(analysisMessage)
           setShowAnalysisDialog(true)
@@ -284,13 +354,15 @@ export default function ChatPage() {
         })
       }
     } else {
-      setMessages((prev) => [...prev, userMessage])
+      // Save the user message to storage
+      await saveMessage(userMessage)
       setInput("")
       setIsLoading(true)
 
       try {
         const result = await sendGeminiMessage(input)
-        setMessages((prev) => [...prev, result])
+        // Save the AI response to storage
+        await saveMessage(result)
 
         // Track token usage if available
         if (result.tokenUsage) {
@@ -365,6 +437,25 @@ export default function ChatPage() {
 
     return (
       <AnimatedElement type="slide-up" duration={400}>
+        {showAudioPlayer && audioBlob && isRecordedAudio && (
+          <AudioPlayer
+            audioBlob={audioBlob}
+            className="mb-3"
+            onConfirm={() => {
+              // Create a File object from the Blob
+              const file = new File([audioBlob], "recorded_audio.mp3", { type: "audio/mp3" })
+              setSelectedFile(file)
+              setShowAudioPlayer(false)
+              // Process the file by triggering the form submission
+              handleSendMessage(new Event('submit') as any)
+            }}
+            onCancel={() => {
+              setShowAudioPlayer(false)
+              resetProcessing()
+              cancelAudioRecording()
+            }}
+          />
+        )}
         {processingError && (
           <div className="flex items-center gap-2 p-3 border border-destructive rounded-xl bg-destructive/10 mb-3">
             <AlertCircle className="h-5 w-5 text-destructive" />
@@ -413,36 +504,13 @@ export default function ChatPage() {
   }
 
   const renderMessage = (message: Message) => {
-    const isUser = message.role === "user"
-
     return (
-      <div
+      <ChatMessage
         key={message.id}
-        className={cn(
-          "flex w-full gap-3 p-4",
-          isUser ? "bg-accent/30" : "bg-secondary/50"
-        )}
-      >
-        {!isUser && <BotAvatar />}
-        <div className="flex-1 space-y-2">
-          <div className="flex items-center gap-2">
-            <span className="text-sm font-medium">
-              {isUser ? "You" : "AI Assistant"}
-            </span>
-            {message.attachmentType && (
-              <span className="text-xs text-gray-500">
-                ({message.attachmentType} file: {message.attachmentName})
-              </span>
-            )}
-          </div>
-          <MarkdownMessage
-            content={message.content}
-            performanceData={message.performanceData}
-            attachmentName={message.attachmentName}
-            attachmentType={message.attachmentType}
-          />
-        </div>
-      </div>
+        message={message}
+        isLoading={isLoading}
+        onShowPerformance={(msg: Message) => setCurrentAnalysis(msg)}
+      />
     )
   }
 
@@ -574,6 +642,20 @@ I recommend practicing these techniques in our chat interface. Would you like to
                 className="w-full gap-2"
                 animation="pulse"
                 ripple
+                onClick={() => {
+                  // Close the dialog
+                  setShowAnalysisDialog(false);
+
+                  // Send a practice request message
+                  const practiceMessage = {
+                    id: Date.now().toString(),
+                    role: 'user',
+                    content: 'I want to practice my sales skills. Can you set up a role-play scenario based on your recommendations?'
+                  };
+
+                  // Save the message and trigger AI response
+                  handleSendMessage(practiceMessage.content);
+                }}
               >
                 <MessageSquare className="h-4 w-4" />
                 Practice with AI Coach

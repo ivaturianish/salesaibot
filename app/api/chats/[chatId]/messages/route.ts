@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import dbConnect from '@/lib/mongoose';
 import Chat from '@/models/Chat';
 import { getCurrentUser } from '@/lib/auth';
+import mongoose from 'mongoose';
 
 // Add a message to a chat
 export async function POST(
@@ -21,12 +22,24 @@ export async function POST(
     // Connect to the database
     await dbConnect();
 
+    // Await params before using its properties
+    const resolvedParams = await params;
+    const chatId = resolvedParams.chatId;
+
+    // Validate the chat ID
+    if (!mongoose.Types.ObjectId.isValid(chatId)) {
+      return NextResponse.json(
+        { error: 'Invalid chat ID format' },
+        { status: 400 }
+      );
+    }
+
     // Parse the request body
     const message = await request.json();
 
     // Find the chat by ID and user ID
     const chat = await Chat.findOne({
-      _id: params.chatId,
+      _id: chatId,
       userId: currentUser.userId,
     });
 

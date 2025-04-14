@@ -170,7 +170,7 @@ const config: Config = {
         'zoom-in': 'zoom-in 0.8s ease-out forwards',
         'zoom-out': 'zoom-out 0.8s ease-out forwards',
         'bounce': 'bounce 1s ease-in-out infinite',
-        'pulse': 'pulse 1.5s ease-in-out infinite',
+        'pulse': 'pulse 3s ease-in-out infinite',
         'spin': 'spin 1.5s linear infinite',
         'flip': 'flip 1s ease-in-out forwards',
         'shake': 'shake 0.5s ease-in-out forwards',

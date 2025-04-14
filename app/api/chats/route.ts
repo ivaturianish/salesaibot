@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import dbConnect from '@/lib/mongoose';
 import Chat from '@/models/Chat';
 import { getCurrentUser } from '@/lib/auth';
+import mongoose from 'mongoose';
 
 // Get all chats for the current user
 export async function GET(request: NextRequest) {
@@ -18,8 +19,16 @@ export async function GET(request: NextRequest) {
     // Connect to the database
     await dbConnect();
 
+    // Validate userId is a valid ObjectId
+    if (!mongoose.Types.ObjectId.isValid(currentUser.userId)) {
+      return NextResponse.json(
+        { error: 'Invalid user ID format' },
+        { status: 400 }
+      );
+    }
+
     // Find all chats for the user
-    const chats = await Chat.find({ userId: currentUser.userId })
+    const chats = await Chat.find({ userId: new mongoose.Types.ObjectId(currentUser.userId) })
       .sort({ updatedAt: -1 })
       .select('_id title updatedAt');
 
@@ -54,9 +63,17 @@ export async function POST(request: NextRequest) {
     // Parse the request body
     const { title, messages } = await request.json();
 
+    // Validate userId is a valid ObjectId
+    if (!mongoose.Types.ObjectId.isValid(currentUser.userId)) {
+      return NextResponse.json(
+        { error: 'Invalid user ID format' },
+        { status: 400 }
+      );
+    }
+
     // Create a new chat
     const chat = await Chat.create({
-      userId: currentUser.userId,
+      userId: new mongoose.Types.ObjectId(currentUser.userId),
       title: title || 'New Chat',
       messages: messages || [],
     });

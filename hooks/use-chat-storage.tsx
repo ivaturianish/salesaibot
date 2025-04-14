@@ -57,13 +57,6 @@ export function useChatStorage({ chatId, initialMessages = [] }: UseChatStorageP
   const [error, setError] = useState<string | null>(null);
   const { toast } = useToast();
 
-  // Load chat on mount if chatId is provided
-  useEffect(() => {
-    if (chatId) {
-      loadChat(chatId);
-    }
-  }, [chatId]);
-
   // Load chat by ID
   const loadChat = useCallback(async (id: string) => {
     setIsLoading(true);
@@ -86,6 +79,77 @@ export function useChatStorage({ chatId, initialMessages = [] }: UseChatStorageP
         description: err.message || 'An error occurred while loading chat',
         variant: 'destructive',
       });
+    } finally {
+      setIsLoading(false);
+    }
+  }, [toast]);
+
+  // Load chat on mount if chatId is provided
+  useEffect(() => {
+    if (chatId) {
+      loadChat(chatId);
+    }
+  }, [chatId, loadChat]);
+
+  // Create a new chat
+  const createChat = useCallback(async (title: string, chatMessages: Message[]): Promise<string> => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      // If there are user messages, try to generate a better title
+      let chatTitle = title;
+      const userMessages = chatMessages.filter(msg => msg.role === 'user');
+
+      if (userMessages.length > 0 && title === 'New Chat') {
+        try {
+          // Try to generate a title based on the messages
+          const titleResponse = await fetch('/api/chats/generate-title', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ messages: chatMessages }),
+          });
+
+          if (titleResponse.ok) {
+            const titleData = await titleResponse.json();
+            if (titleData.title) {
+              chatTitle = titleData.title;
+            }
+          }
+        } catch (titleError) {
+          console.error('Error generating title:', titleError);
+          // Continue with the default title if generation fails
+        }
+      }
+
+      // Create the chat with the title (generated or original)
+      const response = await fetch('/api/chats', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ title: chatTitle, messages: chatMessages }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to create chat');
+      }
+
+      setChat(data.chat);
+      setMessages(chatMessages);
+      return data.chat.id;
+    } catch (err: any) {
+      setError(err.message || 'An error occurred while creating chat');
+      console.error('Create chat error:', err);
+      toast({
+        title: 'Failed to create chat',
+        description: err.message || 'An error occurred while creating chat',
+        variant: 'destructive',
+      });
+      return '';
     } finally {
       setIsLoading(false);
     }
@@ -165,42 +229,6 @@ export function useChatStorage({ chatId, initialMessages = [] }: UseChatStorageP
       setIsLoading(false);
     }
   }, [chat, toast]);
-
-  // Create a new chat
-  const createChat = useCallback(async (title: string, chatMessages: Message[]): Promise<string> => {
-    setIsLoading(true);
-    setError(null);
-    try {
-      const response = await fetch('/api/chats', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ title, messages: chatMessages }),
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || 'Failed to create chat');
-      }
-
-      setChat(data.chat);
-      setMessages(chatMessages);
-      return data.chat.id;
-    } catch (err: any) {
-      setError(err.message || 'An error occurred while creating chat');
-      console.error('Create chat error:', err);
-      toast({
-        title: 'Failed to create chat',
-        description: err.message || 'An error occurred while creating chat',
-        variant: 'destructive',
-      });
-      return '';
-    } finally {
-      setIsLoading(false);
-    }
-  }, [toast]);
 
   return {
     chat,

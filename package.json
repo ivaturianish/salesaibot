@@ -11,7 +11,13 @@
     "deploy:vercel": "vercel --prod",
     "deploy:netlify": "netlify deploy --prod",
     "install:pdf-deps": "node scripts/install-pdf-dependencies.js",
-    "process:training": "node scripts/process-training-pdfs.js"
+    "process:training": "node scripts/process-training-pdfs.js",
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "test:coverage": "jest --coverage",
+    "test:e2e": "playwright test",
+    "test:e2e:ui": "playwright test --ui",
+    "test:e2e:report": "playwright show-report"
   },
   "dependencies": {
     "@google/generative-ai": "latest",
@@ -43,6 +49,7 @@
     "@radix-ui/react-toggle": "^1.1.1",
     "@radix-ui/react-toggle-group": "^1.1.1",
     "@radix-ui/react-tooltip": "^1.1.6",
+    "@tremor/react": "^3.18.7",
     "@types/mime-types": "^2.1.4",
     "@types/pdfjs-dist": "^2.10.378",
     "autoprefixer": "^10.4.20",
@@ -55,6 +62,7 @@
     "embla-carousel-react": "8.5.1",
     "fs": "latest",
     "input-otp": "1.4.1",
+    "jest": "^29.7.0",
     "jsonwebtoken": "^9.0.2",
     "langchain": "^0.3.21",
     "lucide-react": "^0.454.0",
@@ -65,7 +73,7 @@
     "next-themes": "^0.4.4",
     "node-schedule": "^2.1.1",
     "path": "latest",
-    "pdfjs-dist": "^3.11.174",
+    "pdfjs-dist": "^5.1.91",
     "react": "^19.1.0",
     "react-chartjs-2": "latest",
     "react-day-picker": "8.10.1",
@@ -83,9 +91,14 @@
     "zod": "^3.24.1"
   },
   "devDependencies": {
+    "@playwright/test": "^1.51.1",
+    "@testing-library/jest-dom": "^6.6.3",
+    "@testing-library/react": "^16.3.0",
+    "@testing-library/user-event": "^14.6.1",
     "@types/node": "^22",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "jest-environment-jsdom": "^29.7.0",
     "postcss": "^8",
     "tailwindcss": "^3.4.17",
     "typescript": "^5"

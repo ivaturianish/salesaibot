@@ -27,7 +27,7 @@ export function TokenUsage({
 }: TokenUsageProps) {
   // Calculate percentage of tokens used
   const usagePercentage = Math.min(100, (tokensUsed / tokensLimit) * 100);
-  
+
   // Determine color based on usage
   const getUsageColor = () => {
     if (usagePercentage < 50) return 'bg-green-500';
@@ -52,14 +52,14 @@ export function TokenUsage({
               </TooltipTrigger>
               <TooltipContent>
                 <p className="text-xs">
-                  Tokens are units of text processed by the AI. 
+                  Tokens are units of text processed by the AI.
                   Costs are estimated based on current API pricing.
                 </p>
               </TooltipContent>
             </Tooltip>
           </TooltipProvider>
         </div>
-        
+
         <div className="space-y-2">
           <div className="flex items-center justify-between text-xs">
             <span className="text-muted-foreground">
@@ -69,13 +69,18 @@ export function TokenUsage({
               ${estimatedCost.toFixed(4)}
             </span>
           </div>
-          
-          <Progress 
-            value={usagePercentage} 
-            className="h-1.5 bg-secondary/30" 
-            indicatorClassName={getUsageColor()}
+
+          <Progress
+            value={usagePercentage}
+            className="h-1.5 bg-secondary/30"
+            style={{
+              '--progress-value': `${usagePercentage}%`,
+              '--progress-color': usagePercentage < 50 ? 'var(--green-500)' :
+                                 usagePercentage < 80 ? 'var(--amber-500)' :
+                                 'var(--red-500)'
+            } as React.CSSProperties}
           />
-          
+
           {usagePercentage > 80 && (
             <div className="flex items-center gap-1.5 mt-1.5">
               <AlertCircle size={14} className="text-red-500" />

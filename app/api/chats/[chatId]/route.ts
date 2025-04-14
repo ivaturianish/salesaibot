@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import dbConnect from '@/lib/mongoose';
 import Chat from '@/models/Chat';
 import { getCurrentUser } from '@/lib/auth';
+import mongoose from 'mongoose';
 
 // Get a specific chat by ID
 export async function GET(
@@ -21,9 +22,21 @@ export async function GET(
     // Connect to the database
     await dbConnect();
 
+    // Await params before using its properties
+    const resolvedParams = await params;
+    const chatId = resolvedParams.chatId;
+
+    // Validate the chat ID
+    if (!mongoose.Types.ObjectId.isValid(chatId)) {
+      return NextResponse.json(
+        { error: 'Invalid chat ID format' },
+        { status: 400 }
+      );
+    }
+
     // Find the chat by ID and user ID
     const chat = await Chat.findOne({
-      _id: params.chatId,
+      _id: chatId,
       userId: currentUser.userId,
     });
 
@@ -65,12 +78,24 @@ export async function PUT(
     // Connect to the database
     await dbConnect();
 
+    // Await params before using its properties
+    const resolvedParams = await params;
+    const chatId = resolvedParams.chatId;
+
+    // Validate the chat ID
+    if (!mongoose.Types.ObjectId.isValid(chatId)) {
+      return NextResponse.json(
+        { error: 'Invalid chat ID format' },
+        { status: 400 }
+      );
+    }
+
     // Parse the request body
     const { title, messages } = await request.json();
 
     // Find the chat by ID and user ID
     const chat = await Chat.findOne({
-      _id: params.chatId,
+      _id: chatId,
       userId: currentUser.userId,
     });
 
@@ -122,9 +147,21 @@ export async function DELETE(
     // Connect to the database
     await dbConnect();
 
+    // Await params before using its properties
+    const resolvedParams = await params;
+    const chatId = resolvedParams.chatId;
+
+    // Validate the chat ID
+    if (!mongoose.Types.ObjectId.isValid(chatId)) {
+      return NextResponse.json(
+        { error: 'Invalid chat ID format' },
+        { status: 400 }
+      );
+    }
+
     // Find and delete the chat by ID and user ID
     const result = await Chat.deleteOne({
-      _id: params.chatId,
+      _id: chatId,
       userId: currentUser.userId,
     });
 

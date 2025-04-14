@@ -61,6 +61,16 @@ export function clearAuthCookie(response: NextResponse): void {
 // Get current user from token
 export function getCurrentUser(request: NextRequest): JwtPayload | null {
   const token = getAuthToken(request);
+
+  // For development: if no token is present, return a mock user
+  if (!token && process.env.NODE_ENV !== 'production') {
+    return {
+      userId: '6450f0c1f90821e8e4b5b293', // Mock ObjectId
+      email: 'test@example.com',
+      name: 'Test User'
+    };
+  }
+
   if (!token) return null;
   return verifyToken(token);
 }
@@ -86,6 +96,16 @@ export function getServerAuthToken(): string | undefined {
 // Get current user from server-side token
 export function getServerCurrentUser(): JwtPayload | null {
   const token = getServerAuthToken();
+
+  // For development: if no token is present, return a mock user
+  if (!token && process.env.NODE_ENV !== 'production') {
+    return {
+      userId: '6450f0c1f90821e8e4b5b293', // Mock ObjectId
+      email: 'test@example.com',
+      name: 'Test User'
+    };
+  }
+
   if (!token) return null;
   return verifyToken(token);
 }
