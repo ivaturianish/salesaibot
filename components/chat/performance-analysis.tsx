@@ -72,7 +72,7 @@ export function PerformanceAnalysis({
         {/* Header with file info and expand/collapse button */}
         <div className="flex items-center justify-between mb-4">
           <div>
-            <h3 className="text-lg font-semibold bg-clip-text text-transparent bg-gradient-to-r from-primary to-purple-400">
+            <h3 className="text-lg font-semibold bg-clip-text text-transparent bg-gradient-to-r from-primary to-blue-400">
               Performance Analysis
             </h3>
             {fileName && (

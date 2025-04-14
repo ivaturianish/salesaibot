@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { 
+import {
   AreaChart as TremorAreaChart,
   BarChart as TremorBarChart,
   LineChart as TremorLineChart,
@@ -29,18 +29,18 @@ interface ChartProps {
 // Helper function to map color names to Tremor color classes
 const mapColors = (colors: string[] = ['blue']) => {
   const colorMap: Record<string, string> = {
-    primary: 'indigo',
+    primary: 'blue',
     secondary: 'slate',
     green: 'emerald',
     red: 'rose',
     yellow: 'amber',
     blue: 'blue',
-    purple: 'violet',
+    purple: 'blue',
     orange: 'orange',
     pink: 'pink',
     gray: 'gray',
   };
-  
+
   return colors.map(color => colorMap[color] || color);
 };
 
@@ -59,7 +59,7 @@ export function AreaChart({
   subtitle,
 }: ChartProps) {
   const mappedColors = mapColors(colors);
-  
+
   return (
     <Card className={cn('p-0 border-0 shadow-none', className)}>
       {title && <Title>{title}</Title>}
@@ -94,7 +94,7 @@ export function BarChart({
   subtitle,
 }: ChartProps) {
   const mappedColors = mapColors(colors);
-  
+
   return (
     <Card className={cn('p-0 border-0 shadow-none', className)}>
       {title && <Title>{title}</Title>}
@@ -128,7 +128,7 @@ export function LineChart({
   subtitle,
 }: ChartProps) {
   const mappedColors = mapColors(colors);
-  
+
   return (
     <Card className={cn('p-0 border-0 shadow-none', className)}>
       {title && <Title>{title}</Title>}

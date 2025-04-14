@@ -6,6 +6,7 @@ import { UserAvatar } from '@/components/chat/user-avatar';
 import { MarkdownMessage } from '@/components/chat/markdown-message';
 import { PerformanceAnalysis } from '@/components/chat/performance-analysis';
 import { MessageActions } from '@/components/chat/message-actions';
+import { TypingAnimation } from '@/components/chat/typing-animation';
 
 export interface Message {
   id: string;
@@ -59,7 +60,9 @@ export function ChatMessage({
           </div>
         )}
 
-        {message.isAnalysis ? (
+        {isLoading && !isUser ? (
+          <TypingAnimation />
+        ) : message.isAnalysis ? (
           <PerformanceAnalysis performanceData={message.performanceData} fileName={message.attachmentName} fileType={message.attachmentType} />
         ) : (
           <MarkdownMessage content={message.content} />

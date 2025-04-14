@@ -314,6 +314,14 @@ export default function ChatPage() {
         setRecordingComplete(false)
         setIsLoading(true)
 
+        // Add a temporary loading message
+        const loadingMessage: Message = {
+          id: 'loading-' + Date.now(),
+          role: 'assistant',
+          content: 'Analyzing your file...',
+        }
+        setMessages(prev => [...prev, loadingMessage])
+
         try {
           const analysisMessage = await analyzeContentWithGemini(
             fileType,
@@ -322,7 +330,8 @@ export default function ChatPage() {
             input
           )
 
-          // Save the analysis message to storage
+          // Remove the loading message and save the analysis message to storage
+          setMessages(prev => prev.filter(msg => !msg.id.startsWith('loading-')))
           await saveMessage(analysisMessage)
 
           setCurrentAnalysis(analysisMessage)
@@ -339,6 +348,8 @@ export default function ChatPage() {
             })
           }
         } catch (error) {
+          // Remove the loading message
+          setMessages(prev => prev.filter(msg => !msg.id.startsWith('loading-')))
           handleFileError(error, () => {
             setSelectedFile(null)
             resetProcessing()
@@ -359,9 +370,18 @@ export default function ChatPage() {
       setInput("")
       setIsLoading(true)
 
+      // Add a temporary loading message
+      const loadingMessage: Message = {
+        id: 'loading-' + Date.now(),
+        role: 'assistant',
+        content: 'Thinking...',
+      }
+      setMessages(prev => [...prev, loadingMessage])
+
       try {
         const result = await sendGeminiMessage(input)
-        // Save the AI response to storage
+        // Remove the loading message and save the AI response to storage
+        setMessages(prev => prev.filter(msg => !msg.id.startsWith('loading-')))
         await saveMessage(result)
 
         // Track token usage if available
@@ -375,6 +395,8 @@ export default function ChatPage() {
           })
         }
       } catch (error) {
+        // Remove the loading message
+        setMessages(prev => prev.filter(msg => !msg.id.startsWith('loading-')))
         handleMessageError(() => {
           setIsLoading(false)
         })

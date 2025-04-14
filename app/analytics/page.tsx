@@ -16,7 +16,7 @@ export default function AnalyticsPage() {
     <AppLayout>
       <div className="container py-8">
         <div className="mb-8">
-          <h1 className="text-3xl font-bold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-primary to-purple-400">
+          <h1 className="text-3xl font-bold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-primary to-blue-400">
             Analytics
           </h1>
           <p className="text-muted-foreground">Track your sales performance metrics and improvement over time</p>
@@ -97,7 +97,7 @@ export default function AnalyticsPage() {
                     <div className="space-y-2">
                       <div className="flex items-center justify-between text-sm">
                         <span>Overall Score</span>
-                        <span className="font-medium bg-clip-text text-transparent bg-gradient-to-r from-primary to-purple-400">
+                        <span className="font-medium bg-clip-text text-transparent bg-gradient-to-r from-primary to-blue-400">
                           82/100
                         </span>
                       </div>

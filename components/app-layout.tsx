@@ -53,7 +53,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
                       href={item.href}
                       className={`flex items-center gap-3 px-4 py-3 rounded-full transition-all duration-300 ${
                         item.primary
-                          ? "gradient-purple text-white shadow-md shadow-primary/20 hover:shadow-lg hover:shadow-primary/30 hover:scale-105"
+                          ? "gradient-blue text-white shadow-md shadow-primary/20 hover:shadow-lg hover:shadow-primary/30 hover:scale-105"
                           : "text-muted-foreground hover:text-foreground hover:bg-accent hover:scale-105"
                       }`}
                     >
@@ -75,7 +75,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
                 href={item.href}
                 className={`flex items-center gap-2 text-sm font-medium rounded-full px-5 py-2.5 transition-all duration-300 ${
                   item.primary
-                    ? "gradient-purple text-white shadow-md shadow-primary/20 hover:shadow-lg hover:shadow-primary/30 hover:scale-105"
+                    ? "gradient-blue text-white shadow-md shadow-primary/20 hover:shadow-lg hover:shadow-primary/30 hover:scale-105"
                     : "text-muted-foreground hover:text-foreground hover:bg-accent hover:scale-105"
                 }`}
               >
